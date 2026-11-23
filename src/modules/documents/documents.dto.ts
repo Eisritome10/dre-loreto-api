@@ -1,5 +1,7 @@
 import { EstadoDocumento, OrigenDocumento, PrioridadDocumento } from '@prisma/client';
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min, MinLength } from 'class-validator';
+
+const TELEFONO = /^[0-9+ ()-]{6,20}$/;
 
 export class CrearDocumentoDto {
   @IsEnum(OrigenDocumento) origen: OrigenDocumento;
@@ -18,6 +20,9 @@ export class CrearDocumentoDto {
   @IsOptional() @IsString() proveido?: string;
   @IsOptional() @IsString() observacion?: string;
   @IsOptional() @IsEnum(PrioridadDocumento) prioridad?: PrioridadDocumento;
+  /** Contacto para avisar al usuario externo cuando su trámite avance. */
+  @IsOptional() @IsEmail({}, { message: 'El correo de contacto no es válido' }) correoContacto?: string;
+  @IsOptional() @Matches(TELEFONO, { message: 'El celular solo puede tener números, espacios y + - ( )' }) telefonoContacto?: string;
   /** Confirma que se registre aunque exista un documento externo igual. */
   @IsOptional() @IsBoolean() forzar?: boolean;
 }
@@ -34,6 +39,8 @@ export class ActualizarDocumentoDto {
   @IsOptional() @IsString() proveido?: string;
   @IsOptional() @IsString() observacion?: string;
   @IsOptional() @IsEnum(PrioridadDocumento) prioridad?: PrioridadDocumento;
+  @IsOptional() @IsEmail({}, { message: 'El correo de contacto no es válido' }) correoContacto?: string;
+  @IsOptional() @Matches(TELEFONO, { message: 'El celular solo puede tener números, espacios y + - ( )' }) telefonoContacto?: string;
 }
 
 export class ListarDocumentosQuery {
@@ -65,6 +72,10 @@ export class AtenderDto {
 
 export class DevolverDto {
   @IsString() @MinLength(3, { message: 'Indique el motivo de la devolución' }) motivo: string;
+}
+
+export class ListoDto {
+  @IsBoolean() listo: boolean;
 }
 
 export class AnularDto {

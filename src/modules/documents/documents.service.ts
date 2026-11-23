@@ -9,6 +9,7 @@ import { EstadoDerivacion, EstadoDocumento, OrigenDocumento, Prisma, RolUsuario 
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UsuarioActual } from '../../common/auth.types';
 import {
   ActualizarDocumentoDto,
@@ -20,6 +21,7 @@ import {
   claveDocumento,
   claveRegistro,
   formatearNumero,
+  generarCodigoSeguimiento,
   hoyLima,
   parseFecha,
   semaforo,
@@ -41,7 +43,17 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notif: NotificationsService,
   ) {}
+
+  /** Genera un código de seguimiento que no exista todavía. */
+  private async codigoLibre(tx: Prisma.TransactionClient): Promise<string> {
+    for (let i = 0; i < 10; i++) {
+      const c = generarCodigoSeguimiento();
+      if (!(await tx.documento.findUnique({ where: { codigoSeguimiento: c }, select: { id: true } }))) return c;
+    }
+    throw new ConflictException('No se pudo generar el código de seguimiento; intente de nuevo');
+  }
 
   /** Qué documentos puede ver cada rol. */
   alcance(u: UsuarioActual): Prisma.DocumentoWhereInput {
@@ -199,6 +211,9 @@ export class DocumentsService {
           proveido: d.proveido?.trim() || null,
           observacion: d.observacion?.trim() || null,
           prioridad: d.prioridad ?? 'NORMAL',
+          codigoSeguimiento: await this.codigoLibre(tx),
+          correoContacto: d.correoContacto?.trim().toLowerCase() || null,
+          telefonoContacto: d.telefonoContacto?.trim() || null,
           creadoPorId: u.id,
         },
         include: incluirLista,
@@ -209,6 +224,7 @@ export class DocumentsService {
       );
       return doc;
     });
+    this.notif.tramite('REGISTRADO', creado);
     return creado;
   }
 
@@ -222,7 +238,7 @@ export class DocumentsService {
     const data: Prisma.DocumentoUpdateInput = {};
     const cambios: Record<string, { antes: unknown; despues: unknown }> = {};
     const limpiar = (v?: string) => (v === undefined ? undefined : v.trim() || null);
-    const campos = ['numeroDocumento', 'remitente', 'destinatario', 'referencia', 'registroExterno', 'numeroExpediente', 'proveido', 'observacion'] as const;
+    const campos = ['numeroDocumento', 'remitente', 'destinatario', 'referencia', 'registroExterno', 'numeroExpediente', 'proveido', 'observacion', 'correoContacto', 'telefonoContacto'] as const;
     for (const c of campos) {
       const nuevo = limpiar(d[c]);
       if (nuevo !== undefined && nuevo !== doc[c]) {
@@ -263,6 +279,7 @@ export class DocumentsService {
       if (!dest || !dest.activo) throw new BadRequestException('El usuario destino no existe o está inactivo');
       aAreaId = aAreaId ?? dest.areaId;
     }
+    const primeraDerivacion = doc.estado === EstadoDocumento.REGISTRADO;
     const plazo = d.plazoDias ?? 3;
     await this.prisma.$transaction(async (tx) => {
       await tx.derivacion.create({
@@ -285,6 +302,13 @@ export class DocumentsService {
         tx,
       );
     });
+    if (primeraDerivacion) {
+      const [full, destino] = await Promise.all([
+        this.prisma.documento.findUnique({ where: { id }, include: incluirLista }),
+        aAreaId ? this.prisma.area.findUnique({ where: { id: aAreaId } }) : null,
+      ]);
+      if (full) this.notif.tramite('DERIVADO', { ...full, area: destino ?? full.area });
+    }
     return this.obtener(u, id);
   }
 
@@ -334,6 +358,7 @@ export class DocumentsService {
     if (der.estado !== EstadoDerivacion.PENDIENTE && der.estado !== EstadoDerivacion.RECIBIDA) {
       throw new BadRequestException('Esta derivación ya fue atendida o devuelta');
     }
+    let atendidoCompleto = false;
     await this.prisma.$transaction(async (tx) => {
       await tx.derivacion.update({
         where: { id: der.id },
@@ -348,9 +373,16 @@ export class DocumentsService {
       const abiertas = await tx.derivacion.count({
         where: { documentoId: der.documentoId, id: { not: der.id }, estado: { in: [EstadoDerivacion.PENDIENTE, EstadoDerivacion.RECIBIDA] } },
       });
-      if (!abiertas) await tx.documento.update({ where: { id: der.documentoId }, data: { estado: EstadoDocumento.ATENDIDO } });
+      if (!abiertas) {
+        await tx.documento.update({ where: { id: der.documentoId }, data: { estado: EstadoDocumento.ATENDIDO } });
+        atendidoCompleto = true;
+      }
       await this.audit.registrar({ usuarioId: u.id, accion: 'ATENDER', entidad: 'Documento', entidadId: der.documentoId, detalle: { derivacionId, respuesta } }, tx);
     });
+    if (atendidoCompleto) {
+      const full = await this.prisma.documento.findUnique({ where: { id: der.documentoId }, include: incluirLista });
+      if (full) this.notif.tramite('ATENDIDO', full);
+    }
     return this.obtener(u, der.documentoId);
   }
 
@@ -370,6 +402,23 @@ export class DocumentsService {
       await this.audit.registrar({ usuarioId: u.id, accion: 'DEVOLVER', entidad: 'Documento', entidadId: der.documentoId, detalle: { derivacionId, motivo } }, tx);
     });
     return this.obtener(u, der.documentoId);
+  }
+
+  /** Avisa que el documento ya puede recogerse en mesa de partes (o lo quita si fue un error). */
+  async marcarListo(u: UsuarioActual, id: string, listo: boolean) {
+    const doc = await this.visible(u, id);
+    if (!ROLES_GESTION.includes(u.rol)) throw new ForbiddenException('No puede marcar documentos como listos');
+    if (doc.estado === EstadoDocumento.ANULADO) throw new BadRequestException('El documento está anulado');
+    if (doc.listoParaRecoger === listo) return this.obtener(u, id);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.documento.update({ where: { id }, data: { listoParaRecoger: listo, listoEn: listo ? new Date() : null } });
+      await this.audit.registrar({ usuarioId: u.id, accion: listo ? 'LISTO' : 'LISTO_QUITADO', entidad: 'Documento', entidadId: id }, tx);
+    });
+    if (listo) {
+      const full = await this.prisma.documento.findUnique({ where: { id }, include: incluirLista });
+      if (full) this.notif.tramite('LISTO', full);
+    }
+    return this.obtener(u, id);
   }
 
   async archivar(u: UsuarioActual, id: string) {

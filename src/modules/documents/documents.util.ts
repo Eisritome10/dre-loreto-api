@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 
 /** Fecha de hoy en Lima (UTC-5) como Date a medianoche UTC, apta para columnas @db.Date. */
@@ -44,4 +45,19 @@ export function semaforo(fechaLimite: Date | null, estado: string): Semaforo {
   if (dias < 0) return 'VENCIDO';
   if (dias <= 1) return 'POR_VENCER';
   return 'EN_PLAZO';
+}
+
+const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O ni 1/I para que no se confundan al dictar o leer
+
+/** Código de seguimiento de 8 caracteres (XXXX-XXXX): ~850 mil millones de combinaciones. */
+export function generarCodigoSeguimiento(): string {
+  const bytes = randomBytes(8);
+  const c = Array.from(bytes, (b) => ALFABETO[b % ALFABETO.length]).join('');
+  return `${c.slice(0, 4)}-${c.slice(4)}`;
+}
+
+/** Acepta el código con o sin guion, espacios o minúsculas. */
+export function normalizarCodigo(s: string): string | null {
+  const limpio = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return limpio.length === 8 ? `${limpio.slice(0, 4)}-${limpio.slice(4)}` : null;
 }

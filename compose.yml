@@ -20,6 +20,15 @@ services:
       timeout: 5s
       retries: 10
 
+  # Servidor de correo de pruebas: captura los avisos y los muestra en http://localhost:8025
+  mailpit:
+    container_name: dre-loreto-mailpit
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   api:
     container_name: dre-loreto-api
     build: .
@@ -27,6 +36,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -34,6 +45,9 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/dre_loreto
       JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-local-de-al-menos-32-caracteres}
       JWT_EXPIRES_IN: 8h
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      PUBLIC_CONSULTA_URL: http://localhost:8080/consulta
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@drel.local}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin2026!Local}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}

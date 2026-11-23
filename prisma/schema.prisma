@@ -141,6 +141,15 @@ model Documento {
   proveido        String?
   observacion     String?
 
+  /// Código que se entrega en el cargo para consultar el trámite sin iniciar sesión
+  codigoSeguimiento String?          @unique
+  /// Contacto opcional del usuario externo para avisarle cuando su trámite avance
+  correoContacto    String?
+  telefonoContacto  String?
+  /// El documento ya puede recogerse en mesa de partes
+  listoParaRecoger  Boolean            @default(false)
+  listoEn           DateTime?
+
   estado          EstadoDocumento    @default(REGISTRADO)
   prioridad       PrioridadDocumento @default(NORMAL)
   responsableId   String?

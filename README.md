@@ -15,6 +15,7 @@ Stack: NestJS 12 · Prisma 7 · PostgreSQL 17 · JWT · Docker. Frontend: [dre-l
 | Fechas con el año equivocado | La fecha por defecto es la de hoy (Lima) y el año se deduce de ella |
 | Firma física de recepción del especialista | Recepción digital con fecha y hora (`/derivations/:id/receive`) |
 | No se sabe en qué estado está un trámite | Estados, historial completo y consulta pública sin datos personales |
+| El usuario llama para saber en qué va su trámite | Código de seguimiento, consulta pública, aviso de "listo para recoger" y avisos por correo |
 | Un documento anulado deja huecos en la serie | Anulación con motivo: el número queda registrado y no se reutiliza |
 | Reportes manuales para el Director | `/dashboard/summary` y exportación a Excel con los mismos filtros del listado |
 
@@ -28,7 +29,7 @@ Stack: NestJS 12 · Prisma 7 · PostgreSQL 17 · JWT · Docker. Frontend: [dre-l
 ```bash
 cp .env.example .env
 npm install
-docker compose up -d postgres        # PostgreSQL en localhost:5433
+docker compose up -d postgres mailpit # PostgreSQL en localhost:5433 y correo de pruebas en http://localhost:8025
 npx prisma migrate deploy            # crea las tablas
 npm run prisma:seed                  # áreas, tipos de documento y usuarios de prueba
 npm run start:dev                    # API en http://localhost:3000/api/v1
@@ -96,9 +97,18 @@ npm run import:users -- --file usuarios.csv
 
 Si no se indica contraseña, se genera una temporal que se muestra una sola vez; cada persona debe cambiarla al ingresar. Los usuarios existentes se omiten.
 
-## Consulta pública
+## Seguimiento del trámite para el usuario externo
 
-`GET /api/v1/public/consulta?expediente=<N°>&anio=2026` no requiere sesión. Devuelve estado, tipo, asunto, área y movimientos, pero **nunca** remitente, destinatario ni nombres de funcionarios. Tiene un límite de 15 consultas por minuto por IP.
+El usuario que presenta un trámite **no necesita cuenta**: se le entrega un cargo con un *código de seguimiento* (8 caracteres, p. ej. `K7M2-9PQX`, sin 0/O/1/I para evitar confusiones).
+
+1. **Cargo de recepción**: al registrar un documento externo, el sistema genera el código y la interfaz muestra el cargo imprimible con un QR.
+2. **Consulta pública**: `GET /api/v1/public/consulta?codigo=K7M2-9PQX`, sin sesión. Devuelve estado, tipo, asunto, área y recorrido, pero **nunca** remitente, destinatario ni nombres de funcionarios. El código tiene unas 850 mil millones de combinaciones y la consulta está limitada a 15 intentos por minuto por IP, de modo que no se pueden recorrer trámites ajenos.
+3. **Listo para recoger**: la secretaría marca el documento (`POST /documents/:id/ready`) y la consulta pública lo muestra como *"Listo para recoger"*, con el área donde recogerlo.
+4. **Avisos por correo** (opcionales): si al registrar se dejó un correo, el sistema avisa cuando el trámite se registra, se deriva por primera vez, se atiende y cuando está listo para recoger. Los correos llevan solo el estado y el enlace a la consulta, sin remitente ni asunto. Un fallo de envío no interrumpe el trámite.
+
+En local, **Mailpit** (incluido en `compose.yml`) captura los correos y los muestra en <http://localhost:8025>, sin enviar nada a nadie. En producción se configuran `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS` y `MAIL_FROM` con el servidor de correo institucional.
+
+Los documentos importados de los Excel no tienen código de seguimiento (nunca se entregó un cargo con código).
 
 ## Scripts
 
@@ -116,6 +126,7 @@ Si no se indica contraseña, se genera una temporal que se muestra una sola vez;
 ## Pendiente (siguientes versiones)
 
 - Adjuntar el documento escaneado (PDF) a cada registro.
-- Notificación por correo al usuario externo cuando su trámite se resuelve.
+- Avisos por WhatsApp o SMS (hoy solo correo).
+- Portal con cuenta para quienes presentan trámites con frecuencia (UGEL, instituciones educativas).
 - Plazos en días hábiles y feriados.
 - Firma digital.

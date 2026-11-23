@@ -10,6 +10,7 @@ import {
   DerivarDto,
   DevolverDto,
   ListarDocumentosQuery,
+  ListoDto,
 } from './documents.dto';
 import { DocumentsService } from './documents.service';
 
@@ -54,6 +55,11 @@ export class DocumentsController {
   @Post('documents/:id/derive')
   derivar(@CurrentUser() u: UsuarioActual, @Param('id') id: string, @Body() dto: DerivarDto) {
     return this.docs.derivar(u, id, dto);
+  }
+
+  @Post('documents/:id/ready')
+  listo(@CurrentUser() u: UsuarioActual, @Param('id') id: string, @Body() dto: ListoDto) {
+    return this.docs.marcarListo(u, id, dto.listo);
   }
 
   @Post('documents/:id/archive')
