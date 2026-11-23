@@ -86,6 +86,16 @@ Lee los libros de la secretaría de la DGP y el Excel corregido de Infraestructu
 - Al terminar actualiza los contadores, así que el siguiente número que genere el sistema continúa la serie del Excel.
 - Los Excel contienen datos personales: **no se versionan** en este repositorio.
 
+## Cargar los usuarios reales
+
+Copie `usuarios.ejemplo.csv` a `usuarios.csv` (está en `.gitignore`), reemplace las filas por el personal real y ejecute:
+
+```bash
+npm run import:users -- --file usuarios.csv
+```
+
+Si no se indica contraseña, se genera una temporal que se muestra una sola vez; cada persona debe cambiarla al ingresar. Los usuarios existentes se omiten.
+
 ## Consulta pública
 
 `GET /api/v1/public/consulta?expediente=<N°>&anio=2026` no requiere sesión. Devuelve estado, tipo, asunto, área y movimientos, pero **nunca** remitente, destinatario ni nombres de funcionarios. Tiene un límite de 15 consultas por minuto por IP.
@@ -101,6 +111,7 @@ Lee los libros de la secretaría de la DGP y el Excel corregido de Infraestructu
 | `npm run prisma:migrate` | Nueva migración en desarrollo |
 | `npm run prisma:seed` | Catálogos y usuarios iniciales (idempotente) |
 | `npm run import:excel` | Importación de los Excel |
+| `npm run import:users` | Alta de usuarios desde un CSV |
 
 ## Pendiente (siguientes versiones)
 

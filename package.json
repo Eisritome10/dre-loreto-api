@@ -16,7 +16,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:reset": "prisma migrate reset",
-    "import:excel": "ts-node src/scripts/import-excel.ts"
+    "import:excel": "ts-node src/scripts/import-excel.ts",
+    "import:users": "ts-node src/scripts/import-users.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
