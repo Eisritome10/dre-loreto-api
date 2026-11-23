@@ -267,7 +267,8 @@ async function main() {
           numeroExpediente: expediente,
           proveido: get('proveido') || null,
           observacion,
-          estado: cfg.origen === 'EXTERNO' || cfg.origen === 'INTERNO' ? 'REGISTRADO' : 'ARCHIVADO',
+          // El Excel no dice si el trámite sigue abierto: lo importado es historial y no cuenta como pendiente
+          estado: 'ARCHIVADO',
           origenImportacion,
           creadoPorId: admin.id,
         };
