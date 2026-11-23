@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RolUsuario {
+  ADMIN
+  SECRETARIA
+  DIRECTOR
+  ESPECIALISTA
+  CONSULTA
+}
+
+/// EXTERNO: ingresa desde otra entidad o persona. INTERNO: circula entre áreas.
+/// EMITIDO: lo elabora el área (oficio, memorando, resolución...) y se numera.
+enum OrigenDocumento {
+  EXTERNO
+  INTERNO
+  EMITIDO
+}
+
+enum EstadoDocumento {
+  REGISTRADO
+  DERIVADO
+  EN_ATENCION
+  ATENDIDO
+  ARCHIVADO
+  ANULADO
+}
+
+enum PrioridadDocumento {
+  NORMAL
+  URGENTE
+}
+
+enum EstadoDerivacion {
+  PENDIENTE
+  RECIBIDA
+  ATENDIDA
+  DEVUELTA
+}
+
+model Area {
+  id     String  @id @default(uuid())
+  codigo String  @unique
+  nombre String
+  /// Sigla que se usa en la numeración oficial, p. ej. GRL-GGR-GREL-DGP
+  sigla  String
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuarios               Usuario[]
+  documentos             Documento[]
+  derivacionesRecibidas  Derivacion[] @relation("DerivacionAArea")
+  derivacionesEnviadas   Derivacion[] @relation("DerivacionDeArea")
+
+  @@map("areas")
+}
+
+model Usuario {
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  passwordHash        String
+  nombres             String
+  apellidos           String
+  rol                 RolUsuario
+  areaId              String?
+  activo              Boolean    @default(true)
+  debeCambiarPassword Boolean    @default(false)
+  ultimoAcceso        DateTime?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  area                  Area?        @relation(fields: [areaId], references: [id])
+  documentosCreados     Documento[]  @relation("DocumentoCreadoPor")
+  documentosAsignados   Documento[]  @relation("DocumentoResponsable")
+  derivacionesEnviadas  Derivacion[] @relation("DerivacionDeUsuario")
+  derivacionesRecibidas Derivacion[] @relation("DerivacionAUsuario")
+  auditorias            AuditLog[]
+
+  @@index([areaId])
+  @@map("usuarios")
+}
+
+model TipoDocumento {
+  id       String  @id @default(uuid())
+  codigo   String  @unique
+  nombre   String
+  /// Texto que antecede al número: OFICIO, OFICIO (M), MEMORANDO...
+  prefijo  String
+  /// Si es true, el sistema genera el número correlativo por área y año.
+  generaNumeracion Boolean @default(false)
+  activo   Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  documentos Documento[]
+
+  @@map("tipos_documento")
+}
+
+/// Contador atómico. Clave: REG:<origen>:<areaId>:<anio> o DOC:<tipoId>:<areaId>:<anio>
+model Correlativo {
+  clave  String @id
+  ultimo Int    @default(0)
+
+  @@map("correlativos")
+}
+
+model Documento {
+  id              String          @id @default(uuid())
+  origen          OrigenDocumento
+  anio            Int
+  /// N° de orden de registro dentro del área, origen y año (el "N°" del Excel)
+  numeroRegistro  Int
+  areaId          String
+  tipoDocumentoId String
+
+  /// Número tal como figura en el documento (ej. OFICIO N° 002-IEPSM N° 60778)
+  numeroDocumento String?
+  /// Correlativo autogenerado cuando el tipo genera numeración
+  correlativo     Int?
+  fechaIngreso    DateTime        @db.Date
+  fechaDocumento  DateTime?       @db.Date
+
+  remitente       String?
+  destinatario    String?
+  asunto          String
+  referencia      String?
+  /// N° "REG." asignado por otra oficina
+  registroExterno String?
+  /// N° "EXP." de expediente
+  numeroExpediente String?
+  proveido        String?
+  observacion     String?
+
+  estado          EstadoDocumento    @default(REGISTRADO)
+  prioridad       PrioridadDocumento @default(NORMAL)
+  responsableId   String?
+  anuladoMotivo   String?
+  /// Hoja y fila del Excel de origen cuando el registro fue importado
+  origenImportacion String?
+
+  creadoPorId String
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  area          Area          @relation(fields: [areaId], references: [id])
+  tipoDocumento TipoDocumento @relation(fields: [tipoDocumentoId], references: [id])
+  responsable   Usuario?      @relation("DocumentoResponsable", fields: [responsableId], references: [id])
+  creadoPor     Usuario       @relation("DocumentoCreadoPor", fields: [creadoPorId], references: [id])
+  derivaciones  Derivacion[]
+
+  @@unique([areaId, origen, anio, numeroRegistro])
+  @@unique([tipoDocumentoId, areaId, anio, correlativo])
+  @@unique([origenImportacion])
+  @@index([fechaIngreso])
+  @@index([estado])
+  @@index([numeroExpediente])
+  @@index([responsableId])
+  @@map("documentos")
+}
+
+model Derivacion {
+  id          String           @id @default(uuid())
+  documentoId String
+  deUsuarioId String
+  deAreaId    String?
+  aAreaId     String?
+  aUsuarioId  String?
+  indicaciones String?
+  estado      EstadoDerivacion @default(PENDIENTE)
+  fecha       DateTime         @default(now())
+  fechaLimite DateTime?        @db.Date
+  fechaRecepcion DateTime?
+  fechaAtencion  DateTime?
+  respuesta   String?
+
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  deUsuario Usuario   @relation("DerivacionDeUsuario", fields: [deUsuarioId], references: [id])
+  aUsuario  Usuario?  @relation("DerivacionAUsuario", fields: [aUsuarioId], references: [id])
+  deArea    Area?     @relation("DerivacionDeArea", fields: [deAreaId], references: [id])
+  aArea     Area?     @relation("DerivacionAArea", fields: [aAreaId], references: [id])
+
+  @@index([documentoId])
+  @@index([aUsuarioId, estado])
+  @@index([aAreaId, estado])
+  @@map("derivaciones")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  usuarioId  String?
+  accion     String
+  entidad    String
+  entidadId  String
+  detalle    Json?
+  fecha      DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([entidad, entidadId])
+  @@index([fecha])
+  @@map("auditoria")
+}

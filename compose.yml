@@ -1,0 +1,45 @@
+# Entorno local de pruebas: PostgreSQL + API.
+#   docker compose up -d postgres        -> solo base de datos (para `npm run start:dev`)
+#   docker compose up -d --build         -> base de datos + API en http://localhost:3000
+services:
+  postgres:
+    container_name: dre-loreto-postgres
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dre_loreto
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dre_loreto"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    container_name: dre-loreto-api
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:5174,http://localhost:8080
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/dre_loreto
+      JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-local-de-al-menos-32-caracteres}
+      JWT_EXPIRES_IN: 8h
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@drel.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin2026!Local}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-Demo2026!Local}
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
