@@ -364,14 +364,31 @@ export class DocumentsService {
     if (!d.aUsuarioId && !d.aAreaId) throw new BadRequestException('Indique a quién se deriva (persona o área)');
 
     let aAreaId = d.aAreaId ?? null;
+    let destinoPersona: string | null = null;
     if (d.aUsuarioId) {
       const dest = await this.prisma.usuario.findUnique({ where: { id: d.aUsuarioId } });
       if (!dest || !dest.activo) throw new BadRequestException('El usuario destino no existe o está inactivo');
       aAreaId = aAreaId ?? dest.areaId;
+      destinoPersona = `${dest.nombres} ${dest.apellidos}`;
     }
+    const destinoArea = aAreaId ? await this.prisma.area.findUnique({ where: { id: aAreaId }, select: { codigo: true } }) : null;
+    const destinoTexto = [destinoPersona, destinoArea?.codigo].filter(Boolean).join(' · ');
     const primeraDerivacion = doc.estado === EstadoDocumento.REGISTRADO;
     const plazo = d.plazoDias ?? 3;
     await this.prisma.$transaction(async (tx) => {
+      // Quien pasa el documento a otra persona termina su propia parte: la derivación que tenía abierta
+      // (dirigida a él o a su oficina) queda atendida, para que el documento no quede "colgado" en la oficina anterior.
+      const propias: Prisma.DerivacionWhereInput = {
+        documentoId: id,
+        estado: { in: ABIERTAS },
+        esVistoBueno: false,
+        OR: [{ aUsuarioId: u.id }, ...(u.areaId ? [{ aUsuarioId: null, aAreaId: u.areaId }] : [])],
+      };
+      await tx.derivacion.updateMany({ where: { ...propias, fechaRecepcion: null }, data: { fechaRecepcion: new Date() } });
+      await tx.derivacion.updateMany({
+        where: propias,
+        data: { estado: EstadoDerivacion.ATENDIDA, respuesta: `Derivado a ${destinoTexto || 'otra oficina'}`, fechaAtencion: new Date() },
+      });
       await tx.derivacion.create({
         data: {
           documentoId: id,
