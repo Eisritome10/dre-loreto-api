@@ -1,4 +1,4 @@
-import { formatearNumero, hoyLima, parseFecha, semaforo, sumarDias } from './documents.util';
+import { formatearExpediente, formatearNumero, generarCodigoSeguimiento, hoyLima, normalizarCodigo, parseFecha, semaforo, sumarDias } from './documents.util';
 
 describe('documents.util', () => {
   it('formatea el número oficial con ceros, año y sigla del área', () => {
@@ -19,5 +19,21 @@ describe('documents.util', () => {
 
   it('una derivación atendida ya no tiene semáforo', () => {
     expect(semaforo(sumarDias(hoyLima(), -9), 'ATENDIDA')).toBe('SIN_PLAZO');
+  });
+
+  it('muestra el expediente como correlativo/año', () => {
+    expect(formatearExpediente('1234', 2026)).toBe('1234/2026');
+    expect(formatearExpediente('EXP-77', 2026)).toBe('EXP-77');
+    expect(formatearExpediente(null, 2026)).toBeNull();
+  });
+
+  it('un paso de circuito en espera no tiene semáforo', () => {
+    expect(semaforo(sumarDias(hoyLima(), -3), 'EN_ESPERA')).toBe('SIN_PLAZO');
+  });
+
+  it('el código de seguimiento no usa caracteres confusos y se normaliza', () => {
+    for (let i = 0; i < 200; i++) expect(generarCodigoSeguimiento()).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    expect(normalizarCodigo('k7m2 9pqx')).toBe('K7M2-9PQX');
+    expect(normalizarCodigo('abc')).toBeNull();
   });
 });

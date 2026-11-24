@@ -21,6 +21,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json prisma.config.ts tsconfig.json ./
+# Carpeta de documentos escaneados (se monta como volumen)
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
 USER node
 EXPOSE 3000
 # Aplica migraciones, siembra catálogos (idempotente) y levanta la API

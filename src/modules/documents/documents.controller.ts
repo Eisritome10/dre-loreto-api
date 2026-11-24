@@ -6,6 +6,7 @@ import {
   ActualizarDocumentoDto,
   AnularDto,
   AtenderDto,
+  CircuitoDto,
   CrearDocumentoDto,
   DerivarDto,
   DevolverDto,
@@ -55,6 +56,16 @@ export class DocumentsController {
   @Post('documents/:id/derive')
   derivar(@CurrentUser() u: UsuarioActual, @Param('id') id: string, @Body() dto: DerivarDto) {
     return this.docs.derivar(u, id, dto);
+  }
+
+  @Post('documents/:id/route')
+  circuito(@CurrentUser() u: UsuarioActual, @Param('id') id: string, @Body() dto: CircuitoDto) {
+    return this.docs.iniciarCircuito(u, id, dto);
+  }
+
+  @Post('documents/:id/number')
+  numerar(@CurrentUser() u: UsuarioActual, @Param('id') id: string) {
+    return this.docs.numerar(u, id);
   }
 
   @Post('documents/:id/ready')

@@ -7,3 +7,5 @@ dist
 coverage
 .DS_Store
 usuarios.csv
+uploads
+backups

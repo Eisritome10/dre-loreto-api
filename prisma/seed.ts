@@ -9,7 +9,8 @@ const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const BASE = 'GRL-GGR-GREL';
 
-const AREAS = [
+const AREAS: { codigo: string; nombre: string; sigla: string; esMesaPartes?: boolean }[] = [
+  { codigo: 'MESA-PARTES', nombre: 'Mesa de Partes', sigla: `${BASE}-MP`, esMesaPartes: true },
   { codigo: 'DGP', nombre: 'Dirección General Pedagógica', sigla: `${BASE}-DGP` },
   { codigo: 'OGAIE-EI', nombre: 'OGAIE - Equipo de Infraestructura', sigla: `${BASE}-OGAIE/EI` },
   { codigo: 'OGAIE', nombre: 'Oficina de Gestión Administrativa, Infraestructura y Equipamiento', sigla: `${BASE}-OGAIE` },
@@ -17,6 +18,10 @@ const AREAS = [
   { codigo: 'DGI', nombre: 'Dirección de Gestión Institucional', sigla: `${BASE}-DGI` },
   { codigo: 'OAJ', nombre: 'Oficina de Asesoría Jurídica', sigla: `${BASE}-OAJ` },
   { codigo: 'UPER', nombre: 'Unidad de Personal', sigla: `${BASE}-UPER` },
+  // Oficinas citadas en la entrevista; las siglas son provisionales hasta recibir el documento oficial
+  { codigo: 'DIRECCION', nombre: 'Dirección Regional de Educación', sigla: `GRL-GGR-DREL-D` },
+  { codigo: 'PRESUPUESTO', nombre: 'Oficina de Presupuesto', sigla: `${BASE}-OPP` },
+  { codigo: 'ADMINISTRACION', nombre: 'Oficina de Administración', sigla: `${BASE}-ADM` },
   { codigo: 'CPAD', nombre: 'Comisión Permanente de Procesos Administrativos Disciplinarios', sigla: `${BASE}-DGP-CPAD` },
 ];
 
@@ -27,7 +32,7 @@ const TIPOS = [
   { codigo: 'MEMORANDO_MULTIPLE', nombre: 'Memorando múltiple', prefijo: 'MEMORANDO (M)', generaNumeracion: true },
   { codigo: 'INFORME', nombre: 'Informe', prefijo: 'INFORME', generaNumeracion: true },
   { codigo: 'CARTA', nombre: 'Carta', prefijo: 'CARTA', generaNumeracion: true },
-  { codigo: 'RESOLUCION', nombre: 'Resolución', prefijo: 'RESOLUCIÓN DIRECTORAL', generaNumeracion: true },
+  { codigo: 'RESOLUCION', nombre: 'Resolución', prefijo: 'RESOLUCIÓN DIRECTORAL', generaNumeracion: true, numeraAlFirmar: true },
   { codigo: 'REQUERIMIENTO', nombre: 'Pedido de requerimiento', prefijo: 'REQUERIMIENTO', generaNumeracion: true },
   { codigo: 'DIRECTIVA', nombre: 'Directiva', prefijo: 'DIRECTIVA', generaNumeracion: true },
   { codigo: 'SOLICITUD', nombre: 'Solicitud', prefijo: 'SOLICITUD', generaNumeracion: false },
@@ -36,7 +41,7 @@ const TIPOS = [
 
 async function main() {
   for (const a of AREAS) {
-    await prisma.area.upsert({ where: { codigo: a.codigo }, update: {}, create: a });
+    await prisma.area.upsert({ where: { codigo: a.codigo }, update: a.esMesaPartes ? { esMesaPartes: true } : {}, create: a });
   }
   for (const t of TIPOS) {
     await prisma.tipoDocumento.upsert({ where: { codigo: t.codigo }, update: {}, create: t });
@@ -68,6 +73,7 @@ async function main() {
       { email: 'director@drel.local', nombres: 'Director', apellidos: 'DGP', rol: RolUsuario.DIRECTOR, area: 'DGP' },
       { email: 'especialista@drel.local', nombres: 'Especialista', apellidos: 'DGP', rol: RolUsuario.ESPECIALISTA, area: 'DGP' },
       { email: 'consulta@drel.local', nombres: 'Consulta', apellidos: 'DGP', rol: RolUsuario.CONSULTA, area: 'DGP' },
+      { email: 'mesa.partes@drel.local', nombres: 'Mesa de Partes', apellidos: 'DREL', rol: RolUsuario.MESA_PARTES, area: 'MESA-PARTES' },
       { email: 'secretaria.infra@drel.local', nombres: 'Secretaria', apellidos: 'Infraestructura', rol: RolUsuario.SECRETARIA, area: 'OGAIE-EI' },
     ];
     for (const d of demo) {

@@ -15,6 +15,7 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 };
 
 const ETIQUETA_MOVIMIENTO: Record<string, string> = {
+  EN_ESPERA: 'En espera',
   PENDIENTE: 'Pendiente de recepción',
   RECIBIDA: 'Recibido',
   ATENDIDA: 'Atendido',
@@ -52,7 +53,7 @@ export class PublicController {
       include: {
         tipoDocumento: { select: { nombre: true } },
         area: { select: { nombre: true } },
-        derivaciones: { orderBy: { fecha: 'asc' }, include: { aArea: { select: { nombre: true } } } },
+        derivaciones: { orderBy: [{ fecha: 'asc' }, { orden: 'asc' }], where: { estado: { not: 'EN_ESPERA' } }, include: { aArea: { select: { nombre: true } } } },
       },
     });
     if (!d) return null;
@@ -68,6 +69,7 @@ export class PublicController {
       estado: d.estado,
       listoParaRecoger: listo,
       listoEn: listo ? d.listoEn : null,
+      ubicacionActual: d.derivaciones.filter((m) => m.estado === 'PENDIENTE' || m.estado === 'RECIBIDA').at(-1)?.aArea?.nombre ?? d.area.nombre,
       estadoTexto: listo ? 'Listo para recoger' : (ETIQUETA_ESTADO[d.estado] ?? d.estado),
       movimientos: d.derivaciones.map((m) => ({
         fecha: m.fecha,

@@ -60,7 +60,7 @@ export class NotificationsService {
       },
       LISTO: {
         asunto: 'Su documento está listo para recoger',
-        texto: `Su documento (${ref}) está listo. Puede recogerlo en la mesa de partes de ${d.area.nombre}, presentando su cargo de recepción.`,
+        texto: `Su documento (${ref}) está listo. Puede recogerlo en ${d.area.nombre}, presentando su cargo de recepción.`,
       },
     };
     const m = mensajes[evento];

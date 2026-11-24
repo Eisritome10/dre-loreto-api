@@ -20,6 +20,29 @@ services:
       timeout: 5s
       retries: 10
 
+  # Respaldo diario de la base de datos en ./backups (7 diarios, 4 semanales, 6 mensuales).
+  # Copia manual:   docker compose exec backup /backup.sh
+  # Restaurar:      ver README, sección "Respaldo y restauración"
+  backup:
+    container_name: dre-loreto-backup
+    image: prodrigestivill/postgres-backup-local:17
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: dre_loreto
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - ./backups:/backups
+
   # Servidor de correo de pruebas: captura los avisos y los muestra en http://localhost:8025
   mailpit:
     container_name: dre-loreto-mailpit
@@ -45,6 +68,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/dre_loreto
       JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-local-de-al-menos-32-caracteres}
       JWT_EXPIRES_IN: 8h
+      UPLOADS_DIR: /app/uploads
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
       PUBLIC_CONSULTA_URL: http://localhost:8080/consulta
@@ -54,6 +78,9 @@ services:
       SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-Demo2026!Local}
     ports:
       - "3000:3000"
+    volumes:
+      - uploads_data:/app/uploads
 
 volumes:
   postgres_data:
+  uploads_data:

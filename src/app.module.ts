@@ -9,6 +9,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AreasModule } from './modules/areas/areas.module';
 import { DocumentTypesModule } from './modules/document-types/document-types.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PublicModule } from './modules/public/public.module';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
@@ -31,6 +32,7 @@ function validateEnv(env: Record<string, unknown>) {
     AreasModule,
     DocumentTypesModule,
     DocumentsModule,
+    AttachmentsModule,
     DashboardModule,
     PublicModule,
   ],

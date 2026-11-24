@@ -30,7 +30,15 @@ export async function siguienteCorrelativo(tx: Prisma.TransactionClient, clave: 
 }
 
 export const claveRegistro = (origen: string, areaId: string, anio: number) => `REG:${origen}:${areaId}:${anio}`;
+/** Contador de expedientes de Mesa de Partes: uno solo por año para toda la institución. */
+export const claveExpediente = (anio: number) => `EXP:${anio}`;
 export const claveDocumento = (tipoId: string, areaId: string, anio: number) => `DOC:${tipoId}:${areaId}:${anio}`;
+
+/** El expediente se muestra como correlativo/año (ej. 1234/2026); si no es un número puro se deja tal cual. */
+export function formatearExpediente(numero: string | null | undefined, anio: number): string | null {
+  if (!numero) return null;
+  return /^\d+$/.test(numero) ? `${numero}/${anio}` : numero;
+}
 
 export function formatearNumero(prefijo: string, n: number, anio: number, sigla: string) {
   return `${prefijo} N° ${String(n).padStart(3, '0')}-${anio}-${sigla}`;
@@ -40,7 +48,7 @@ export type Semaforo = 'SIN_PLAZO' | 'EN_PLAZO' | 'POR_VENCER' | 'VENCIDO';
 
 /** Verde / amarillo / rojo para el plazo de atención de una derivación. */
 export function semaforo(fechaLimite: Date | null, estado: string): Semaforo {
-  if (!fechaLimite || estado === 'ATENDIDA' || estado === 'DEVUELTA') return 'SIN_PLAZO';
+  if (!fechaLimite || estado === 'ATENDIDA' || estado === 'DEVUELTA' || estado === 'EN_ESPERA') return 'SIN_PLAZO';
   const dias = Math.round((fechaLimite.getTime() - hoyLima().getTime()) / (24 * 3600 * 1000));
   if (dias < 0) return 'VENCIDO';
   if (dias <= 1) return 'POR_VENCER';

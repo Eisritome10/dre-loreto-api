@@ -12,6 +12,8 @@ enum RolUsuario {
   DIRECTOR
   ESPECIALISTA
   CONSULTA
+  /// Registra los documentos externos al ingreso, asigna el N° de expediente y los deriva a la oficina
+  MESA_PARTES
 }
 
 /// EXTERNO: ingresa desde otra entidad o persona. INTERNO: circula entre áreas.
@@ -37,6 +39,8 @@ enum PrioridadDocumento {
 }
 
 enum EstadoDerivacion {
+  /// Paso futuro de un circuito de vistos buenos: se activa cuando termina el anterior
+  EN_ESPERA
   PENDIENTE
   RECIBIDA
   ATENDIDA
@@ -50,6 +54,8 @@ model Area {
   /// Sigla que se usa en la numeración oficial, p. ej. GRL-GGR-GREL-DGP
   sigla  String
   activo Boolean @default(true)
+  /// Mesa de Partes: recibe los documentos externos y genera el N° de expediente (correlativo por año)
+  esMesaPartes Boolean @default(false)
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -83,6 +89,7 @@ model Usuario {
   derivacionesEnviadas  Derivacion[] @relation("DerivacionDeUsuario")
   derivacionesRecibidas Derivacion[] @relation("DerivacionAUsuario")
   auditorias            AuditLog[]
+  adjuntos              Adjunto[]
 
   @@index([areaId])
   @@map("usuarios")
@@ -96,6 +103,8 @@ model TipoDocumento {
   prefijo  String
   /// Si es true, el sistema genera el número correlativo por área y año.
   generaNumeracion Boolean @default(false)
+  /// El número se asigna cuando el documento ya está firmado (ej. resoluciones), no al registrarlo
+  numeraAlFirmar   Boolean @default(false)
   activo   Boolean @default(true)
 
   creadoEn      DateTime @default(now())
@@ -129,6 +138,10 @@ model Documento {
   correlativo     Int?
   fechaIngreso    DateTime        @db.Date
   fechaDocumento  DateTime?       @db.Date
+  /// Fecha en que Mesa de Partes recibió el documento, si es anterior a la llegada a esta oficina
+  fechaMesaPartes DateTime?       @db.Date
+  /// Cuándo se firmó y numeró (documentos que se numeran al firmar)
+  numeradoEn      DateTime?
 
   remitente       String?
   destinatario    String?
@@ -166,6 +179,7 @@ model Documento {
   responsable   Usuario?      @relation("DocumentoResponsable", fields: [responsableId], references: [id])
   creadoPor     Usuario       @relation("DocumentoCreadoPor", fields: [creadoPorId], references: [id])
   derivaciones  Derivacion[]
+  adjuntos      Adjunto[]
 
   @@unique([areaId, origen, anio, numeroRegistro])
   @@unique([tipoDocumentoId, areaId, anio, correlativo])
@@ -191,6 +205,13 @@ model Derivacion {
   fechaRecepcion DateTime?
   fechaAtencion  DateTime?
   respuesta   String?
+  /// Jefatura que dispuso la derivación mediante proveído
+  dispuestoPor String?
+  /// Oficio que formaliza la derivación, si lo hay
+  oficioReferencia String?
+  /// Orden dentro de un circuito de vistos buenos
+  orden       Int?
+  esVistoBueno Boolean         @default(false)
 
   documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
   deUsuario Usuario   @relation("DerivacionDeUsuario", fields: [deUsuarioId], references: [id])
@@ -202,6 +223,25 @@ model Derivacion {
   @@index([aUsuarioId, estado])
   @@index([aAreaId, estado])
   @@map("derivaciones")
+}
+
+/// Documento escaneado u otro archivo de respaldo del trámite
+model Adjunto {
+  id          String   @id @default(uuid())
+  documentoId String
+  nombre      String
+  mime        String
+  tamano      Int
+  /// Nombre del archivo en el almacenamiento (no se expone)
+  archivo     String
+  subidoPorId String
+  creadoEn    DateTime @default(now())
+
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  subidoPor Usuario   @relation(fields: [subidoPorId], references: [id])
+
+  @@index([documentoId])
+  @@map("adjuntos")
 }
 
 model AuditLog {

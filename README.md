@@ -29,7 +29,7 @@ Stack: NestJS 12 · Prisma 7 · PostgreSQL 17 · JWT · Docker. Frontend: [dre-l
 ```bash
 cp .env.example .env
 npm install
-docker compose up -d postgres mailpit # PostgreSQL en localhost:5433 y correo de pruebas en http://localhost:8025
+docker compose up -d postgres mailpit backup # PostgreSQL en localhost:5433, correo de pruebas en :8025 y respaldo diario
 npx prisma migrate deploy            # crea las tablas
 npm run prisma:seed                  # áreas, tipos de documento y usuarios de prueba
 npm run start:dev                    # API en http://localhost:3000/api/v1
@@ -55,6 +55,7 @@ El seed crea un administrador y, con `SEED_DEMO_USERS=true`, un usuario por perf
 | `especialista@drel.local` | ESPECIALISTA | DGP |
 | `consulta@drel.local` | CONSULTA | DGP |
 | `secretaria.infra@drel.local` | SECRETARIA | OGAIE-EI (Infraestructura) |
+| `mesa.partes@drel.local` | MESA_PARTES | MESA-PARTES |
 
 ## Perfiles y permisos
 
@@ -62,7 +63,8 @@ El seed crea un administrador y, con `SEED_DEMO_USERS=true`, un usuario por perf
 |---|---|---|
 | ADMIN | Todo | Todo, más usuarios, áreas y tipos de documento |
 | DIRECTOR | Todo | Registrar, derivar, archivar, anular, reportes y auditoría |
-| SECRETARIA | Su área y lo derivado a ella | Registrar (incluye externos), derivar, archivar, anular |
+| MESA_PARTES | Su área y lo derivado a ella | Registrar solo documentos externos (genera el expediente) y derivarlos a la oficina; anular; marcar listo para recoger |
+| SECRETARIA | Su área y lo derivado a ella | Registrar (incluye externos), derivar, circuitos de vistos buenos, numerar al firmar, archivar, anular |
 | ESPECIALISTA | Lo que se le asignó o creó | Recibir, atender, devolver, derivar lo suyo y pedir número de documentos emitidos |
 | CONSULTA | Su área | Solo lectura |
 
@@ -86,6 +88,48 @@ Lee los libros de la secretaría de la DGP y el Excel corregido de Infraestructu
 - Corrige fechas con año distinto de 2026 y deja la nota en la observación.
 - Al terminar actualiza los contadores, así que el siguiente número que genere el sistema continúa la serie del Excel.
 - Los Excel contienen datos personales: **no se versionan** en este repositorio.
+
+## Cómo recoge el sistema lo dicho en la entrevista
+
+Del documento *Entrevista PETI DREL* (trámite documentario, oficina de Infraestructura):
+
+### Mesa de Partes
+
+Mesa de Partes recibe los documentos externos, **asigna el N° de expediente** y los deriva a la oficina competente. El perfil `MESA_PARTES` (área `MESA-PARTES`) hace las dos cosas en un solo paso: registra, el sistema genera el expediente (correlativo por año, que se reinicia cada enero) y lo deriva con plazo, jefatura que dispuso y oficio. Así el cargo con el código de seguimiento se entrega desde el primer día, y la oficina destino lo ve en su bandeja. El expediente se muestra como `1234/2026` y se puede buscar así.
+
+> Si Mesa de Partes sigue usando su sistema actual, las oficinas pueden escribir a mano el N° de expediente que ella asignó; solo se genera automáticamente cuando el documento se registra en el área Mesa de Partes.
+
+### Dónde está el documento
+
+El listado y el detalle muestran la **ubicación actual** (oficina y persona, o *por recibir*). La consulta pública muestra solo el nombre de la oficina. Cada derivación guarda **quién la dispuso** (proveído de la jefatura) y el **oficio que la formaliza**. La *fecha de ingreso* es la de llegada a la oficina, como en la práctica actual, y se puede anotar aparte la fecha en que Mesa de Partes lo recibió.
+
+### Resoluciones: vistos buenos y numeración al firmar
+
+- **Circuito de vistos buenos** (`POST /documents/:id/route`): el documento pasa por varias oficinas una tras otra (ej. Presupuesto → Asesoría Jurídica → Administración). Cada paso se activa cuando el anterior da su visto bueno; si uno lo devuelve, el circuito se detiene.
+- **Numeración al firmar**: los tipos con `numeraAlFirmar` (las resoluciones) nacen sin número. Cuando la directora firma, la secretaría usa *Firmada: asignar número* (`POST /documents/:id/number`) y recibe el siguiente correlativo del año de la firma. No se puede numerar con vistos buenos pendientes ni dos veces.
+
+### Documentos escaneados
+
+Cada trámite admite hasta 20 archivos PDF, JPG o PNG de hasta 10 MB (`POST /documents/:id/attachments`, campo `archivo`). Se valida el contenido real del archivo, no solo su extensión; la descarga exige sesión y que el usuario pueda ver el documento. Se guardan en `UPLOADS_DIR` (en Docker, el volumen `uploads_data`).
+
+### Carpeta física
+
+Cada documento muestra su **etiqueta de carpeta** (oficina y año, p. ej. `OGAIE-EI 2026`), igual a la que se rotula en el archivo físico, y el cargo la imprime.
+
+### Respaldo y restauración
+
+El servicio `backup` del `compose.yml` hace un **respaldo diario** de la base en `./backups` (7 diarios, 4 semanales y 6 mensuales). Copia manual y restauración:
+
+```bash
+docker compose exec backup /backup.sh
+gunzip -c backups/last/dre_loreto-latest.sql.gz | docker compose exec -T postgres psql -U postgres -d dre_loreto_restaurada
+```
+
+(cree antes la base destino con `CREATE DATABASE`). Los documentos escaneados están en el volumen `uploads_data`; respáldelo con la misma frecuencia. Verificado: una restauración devuelve los mismos registros que la base original.
+
+### Cortes de energía e internet
+
+Es una aplicación web, por lo que necesita red y electricidad. Para el trabajo diario se recomienda instalarla **en un servidor dentro de la red de la DREL** (funciona aunque se caiga el internet externo) con un **UPS**. Solo los avisos por correo necesitan internet y, si fallan, el trámite continúa. El trabajo sin conexión queda para una versión futura.
 
 ## Cargar los usuarios reales
 
@@ -125,7 +169,6 @@ Los documentos importados de los Excel no tienen código de seguimiento (nunca s
 
 ## Pendiente (siguientes versiones)
 
-- Adjuntar el documento escaneado (PDF) a cada registro.
 - Avisos por WhatsApp o SMS (hoy solo correo).
 - Portal con cuenta para quienes presentan trámites con frecuencia (UGEL, instituciones educativas).
 - Plazos en días hábiles y feriados.
