@@ -17,7 +17,11 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:reset": "prisma migrate reset",
     "import:excel": "ts-node src/scripts/import-excel.ts",
-    "import:users": "ts-node src/scripts/import-users.ts"
+    "import:users": "ts-node src/scripts/import-users.ts",
+    "numeracion": "ts-node src/scripts/numeracion.ts",
+    "prueba:verificar": "ts-node src/scripts/prueba.ts verificar",
+    "prueba:preparar": "ts-node src/scripts/prueba.ts preparar",
+    "prueba:reiniciar": "ts-node src/scripts/prueba.ts reiniciar"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

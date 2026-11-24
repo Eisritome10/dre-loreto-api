@@ -131,6 +131,17 @@ gunzip -c backups/last/dre_loreto-latest.sql.gz | docker compose exec -T postgre
 
 Es una aplicación web, por lo que necesita red y electricidad. Para el trabajo diario se recomienda instalarla **en un servidor dentro de la red de la DREL** (funciona aunque se caiga el internet externo) con un **UPS**. Solo los avisos por correo necesitan internet y, si fallan, el trámite continúa. El trabajo sin conexión queda para una versión futura.
 
+## Sesión de prueba con usuarios
+
+```bash
+npm run prueba:verificar    # servicios, usuarios de prueba y datos listos
+npm run prueba:preparar     # deja 3 documentos en la bandeja de Infraestructura (derivados por Mesa de Partes)
+npm run prueba:reiniciar    # borra lo de la prueba y vuelve a cargar los Excel (~50 s)
+npm run numeracion          # lista las series; con --area/--tipo/--anio/--ultimo ajusta el último número usado
+```
+
+La guía con los escenarios, el cuestionario y los criterios de aceptación está en `DOCUMENTOS/Guia_Prueba_Usuaria_Infraestructura.docx` del proyecto (no se versiona aquí). Usuarios de prueba adicionales: `especialista.infra@drel.local` (ESPECIALISTA de Infraestructura).
+
 ## Cargar los usuarios reales
 
 Copie `usuarios.ejemplo.csv` a `usuarios.csv` (está en `.gitignore`), reemplace las filas por el personal real y ejecute:

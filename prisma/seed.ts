@@ -73,6 +73,7 @@ async function main() {
       { email: 'director@drel.local', nombres: 'Director', apellidos: 'DGP', rol: RolUsuario.DIRECTOR, area: 'DGP' },
       { email: 'especialista@drel.local', nombres: 'Especialista', apellidos: 'DGP', rol: RolUsuario.ESPECIALISTA, area: 'DGP' },
       { email: 'consulta@drel.local', nombres: 'Consulta', apellidos: 'DGP', rol: RolUsuario.CONSULTA, area: 'DGP' },
+      { email: 'especialista.infra@drel.local', nombres: 'Especialista', apellidos: 'Infraestructura', rol: RolUsuario.ESPECIALISTA, area: 'OGAIE-EI' },
       { email: 'mesa.partes@drel.local', nombres: 'Mesa de Partes', apellidos: 'DREL', rol: RolUsuario.MESA_PARTES, area: 'MESA-PARTES' },
       { email: 'secretaria.infra@drel.local', nombres: 'Secretaria', apellidos: 'Infraestructura', rol: RolUsuario.SECRETARIA, area: 'OGAIE-EI' },
     ];
